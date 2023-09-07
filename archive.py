@@ -144,22 +144,35 @@ class Topic:
         )
 
 
-def main():
+def main() -> None:
+    """
+    Sync posts back to `metdata[last_sync_date] - 1 day`, and then save the rendered
+    version of all topics associated with those posts.
+    """
     (posts_dir := TARGET_DIR / 'posts').mkdir(parents=True, exist_ok=True)
     (topics_dir := TARGET_DIR / 'rendered-topics').mkdir(parents=True, exist_ok=True)
 
-    latest_id = None
-    for yr_dir in sorted(posts_dir.glob('*'), reverse=True)[:1]:
-        for month_dir in sorted(yr_dir.glob('*'), reverse=True)[:1]:
-            for post in sorted(month_dir.glob('*.json'), reverse=True)[:1]:
-                latest_id = PostSlug.id_from_filename(post.name)
+    metadata_file = TARGET_DIR / '.metadata.json'
+    last_sync_date = None
+    metadata = {}
 
-    log.info("detected latest post id as %s", latest_id)
+    if metadata_file.exists():
+        metadata = json.loads(metadata_file.read_text())
+        last_sync_date = datetime.datetime.fromisoformat(metadata['last_sync_date'])
+
+    if last_sync_date:
+        # Resync over the last day to catch any post edits.
+        last_sync_date -= datetime.timedelta(days=1)
+
+    log.info("detected latest synced post date: %s", last_sync_date)
 
     topics_to_get = {}
-    last_id_processed = None
+    max_created_at = None
+    last_created_at: datetime.datetime | None = None
+    last_id: int | None = None
 
     posts = http_get_json('/posts.json')['latest_posts']
+    no_new_posts = False
 
     while posts:
         log.info("processing %d posts", len(posts))
@@ -169,28 +182,45 @@ def main():
             except Exception:
                 log.warning("failed to deserialize post %s", json_post)
                 raise
+            last_created_at = post.get_created_at()
+
+            if last_sync_date is not None:
+                no_new_posts = last_created_at < last_sync_date
+                if no_new_posts:
+                    break
+
             post.save(posts_dir)
-            last_id_processed = post.id
+
+            if not max_created_at:
+                # Set in this way because the first /post.json result returned will be
+                # the latest created_at.
+                max_created_at = post.get_created_at()
+
+            last_id = post.id
             topic = post.get_topic()
             topics_to_get[topic.id] = topic
 
-        if latest_id is not None and last_id_processed < latest_id:
-            break
-        if last_id_processed <= 1:
+        if no_new_posts or last_id is not None and last_id <= 1:
+            log.info("no new posts, stopping")
             break
 
         time.sleep(POSTS_DELAY_SECS)
         posts = http_get_json(
-            f'/posts.json?before={last_id_processed - 1}')['latest_posts']
+            f'/posts.json?before={last_id - 1}')['latest_posts']
 
         # Discourse implicitly limits the posts query for IDs between `before` and
         # `before - 50`, so if we don't get any results we have to kind of scan.
-        while not posts and last_id_processed >= 0:
+        while not posts and last_id >= 0:
             # This is probably off-by-one, but doesn't hurt to be safe.
-            last_id_processed -= 49
+            last_id -= 49
             posts = http_get_json(
-                f'/posts.json?before={last_id_processed}')['latest_posts']
+                f'/posts.json?before={last_id}')['latest_posts']
             time.sleep(1)
+
+    if max_created_at is not None:
+        metadata['last_sync_date'] = max_created_at.isoformat()
+        log.info("writing metadata: %s", metadata)
+        metadata_file.write_text(json.dumps(metadata, indent=2))
 
     time.sleep(3)
 
