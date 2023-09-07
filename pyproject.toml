@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discourse_archive"
+authors = [
+  { name="James O'Beirne", email="w.pypi@au92.org" },
+]
+description = "Create a simple content archive from a Discourse site"
+readme = "README.md"
+requires-python = ">=3.11"
+version = "0.1.2"
+
+[project.urls]
+"Homepage" = "https://github.com/jamesob/discourse-archive"
+"Bug Tracker" = "https://github.com/jamesob/discourse-archive/issues"
+
+[project.scripts]
+discourse-archive = "archive:main"
