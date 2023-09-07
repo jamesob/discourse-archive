@@ -80,19 +80,12 @@ class Post:
     def get_created_at(self) -> datetime.datetime:
         return datetime.datetime.fromisoformat(self.raw['created_at'])
 
-    def get_year(self) -> int:
-        return self.get_created_at().year
-
-    def get_month_name(self) -> str:
-        dt = self.get_created_at()
-        return f"{dt.strftime('%m')}-{dt.strftime('%B')}"
-
     def save(self, dir: Path):
         """Write the raw post to disk."""
         idstr = str(self.id).zfill(10)
         filename = f"{idstr}-{self.raw['username']}-{self.raw['topic_slug']}.json"
-        rel_path = Path(str(self.get_year())) / self.get_month_name() / filename
-        full_path = dir / rel_path
+        folder_name = self.get_created_at().strftime('%Y-%m-%B')
+        full_path = dir / folder_name / filename
         full_path.parent.mkdir(parents=True, exist_ok=True)
         log.info("saving post %s to %s", self.id, full_path)
         full_path.write_text(json.dumps(self.raw, indent=2))
@@ -123,21 +116,12 @@ class Topic:
     def get_created_at(self) -> datetime.datetime:
         return datetime.datetime.fromisoformat(self.raw['created_at'])
 
-    def get_year(self) -> int:
-        return self.get_created_at().year
-
-    def get_month_name(self) -> str:
-        dt = self.get_created_at()
-        return f"{dt.strftime('%m')}-{dt.strftime('%B')}"
-
     def save_rendered(self, dir: Path):
         """Write the rendered (.md) topic to disk."""
-        idstr = str(self.id).zfill(10)
         date = str(self.get_created_at().date())
-        filename = f"{idstr}-{date}-{self.slug}.md"
-
-        rel_path = Path(str(self.get_year())) / self.get_month_name() / filename
-        full_path = dir / rel_path
+        filename = f"{date}-{self.slug}-id{self.id}.md"
+        folder_name = self.get_created_at().strftime('%Y-%m-%B')
+        full_path = dir / folder_name / filename
         full_path.parent.mkdir(parents=True, exist_ok=True)
         log.info("saving topic markdown %s to %s", self.id, full_path)
         markdown = f"# {self.raw['title']}\n\n{self.markdown}"
