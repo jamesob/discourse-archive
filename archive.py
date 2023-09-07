@@ -5,11 +5,13 @@ This script does a basic archive of Discourse content by way of its API.
 TODO: figure out how to handle post updates.
 
 """
+import argparse
 import urllib.request
 import sys
 import time
 import os
 import json
+import functools
 import datetime
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,10 +29,22 @@ except ImportError:
 log = logging.getLogger('archive')
 
 
-DISCOURSE_URL = os.environ.get('DISCOURSE_URL', 'https://delvingbitcoin.org')
-TARGET_DIR = Path(os.environ.get('TARGET_DIR', './archive'))
+parser = argparse.ArgumentParser(
+    'discourse-archive',
+    description='Create a basic content archive from a Discourse installation')
+parser.add_argument(
+    '-u', '--url', help='URL of the Discourse server',
+    default=os.environ.get('DISCOURSE_URL', 'https://delvingbitcoin.org'))
+parser.add_argument(
+    '--debug', action='store_true', default=os.environ.get('DEBUG'))
+parser.add_argument(
+    '-t', '--target-dir', help='Target directory for the archive',
+    default=Path(os.environ.get('TARGET_DIR', './archive')))
 
-POSTS_DELAY_SECS = 5
+
+@functools.cache
+def args():
+    return parser.parse_args()
 
 
 def http_get(path) -> str:
@@ -39,7 +53,7 @@ def http_get(path) -> str:
 
     while True:
         try:
-            with urllib.request.urlopen(f"{DISCOURSE_URL}{path}") as f:
+            with urllib.request.urlopen(f"{args().url}{path}") as f:
                 return f.read().decode()
         except Exception:
             time.sleep(backoff)
@@ -149,10 +163,12 @@ def main() -> None:
     Sync posts back to `metdata[last_sync_date] - 1 day`, and then save the rendered
     version of all topics associated with those posts.
     """
-    (posts_dir := TARGET_DIR / 'posts').mkdir(parents=True, exist_ok=True)
-    (topics_dir := TARGET_DIR / 'rendered-topics').mkdir(parents=True, exist_ok=True)
+    target_dir = args().target_dir
 
-    metadata_file = TARGET_DIR / '.metadata.json'
+    (posts_dir := target_dir / 'posts').mkdir(parents=True, exist_ok=True)
+    (topics_dir := target_dir / 'rendered-topics').mkdir(parents=True, exist_ok=True)
+
+    metadata_file = target_dir / '.metadata.json'
     last_sync_date = None
     metadata = {}
 
@@ -204,7 +220,7 @@ def main() -> None:
             log.info("no new posts, stopping")
             break
 
-        time.sleep(POSTS_DELAY_SECS)
+        time.sleep(5)
         posts = http_get_json(
             f'/posts.json?before={last_id - 1}')['latest_posts']
 
