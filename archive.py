@@ -243,10 +243,14 @@ def main() -> None:
     for topic in topics_to_get.values():
         data = http_get_json(f"/t/{topic.id}.json")
         body = http_get(f"/raw/{topic.id}")
+        page_num = 2
 
         if not body:
             log.warning("could not retrieve topic %d markdown", topic.id)
             continue
+
+        while (more_body := http_get(f"/raw/{topic.id}?page={page_num}")):
+            body += f"\n{more_body}"
 
         t = Topic.from_json(data, body)
         t.save_rendered(topics_dir)
