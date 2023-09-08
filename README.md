@@ -2,12 +2,22 @@
 
 A script that provides a basic archive of Discourse contents.
 
+## Install
+
+```sh
+% pip install discourse-archive
+```
+
+or, if you don't trust package managers:
+
+```sh
+% curl https://raw.githubusercontent.com/jamesob/discourse-archive/master/archive.py > /on/your/path/discourse-archive
+% chmod +x /on/your/path/discourse-archive
+```
 
 ## Usage
 
-```
-% pip install discourse-archive
-
+```sh
 % discourse-archive --help
 usage: discourse-archive [-h] [-u URL] [--debug] [-t TARGET_DIR]
 
