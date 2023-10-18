@@ -164,6 +164,7 @@ def main() -> None:
     version of all topics associated with those posts.
     """
     target_dir = args().target_dir
+    target_dir = Path(target_dir) if not isinstance(target_dir, Path) else target_dir
 
     (posts_dir := target_dir / 'posts').mkdir(parents=True, exist_ok=True)
     (topics_dir := target_dir / 'rendered-topics').mkdir(parents=True, exist_ok=True)
